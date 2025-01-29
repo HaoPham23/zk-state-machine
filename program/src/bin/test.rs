@@ -1,17 +1,7 @@
-use ff::PrimeField;
 #[allow(unused)]
 use kzg_rs::{trusted_setup::KzgSettings, KzgError};
 use sp1_bls12_381::{Scalar, G1Affine, G2Affine};
-
-fn commit(poly: Vec<Scalar>, kzg_settings: &KzgSettings) -> Result<G1Affine, KzgError> {
-    let g1 = kzg_settings.g1_points;
-    let mut commitment = sp1_bls12_381::G1Affine::identity();
-    for i in 0..poly.len() {
-        let coeff = G1Affine::from(g1[i] * poly[i]);
-        commitment = commitment.add_affine(&coeff);
-    }
-    Ok(commitment)
-}
+use alloy_sol_types::SolType;
 
 fn compute_lagrange_basis(tau: Scalar, domain: Vec<Scalar>) -> Result<Vec<G1Affine>, KzgError> {
     let mut basis: Vec<G1Affine> = Vec::new();
@@ -175,6 +165,27 @@ fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , phi: G
     let next_phi = phi.add_affine(&e);
     pp.idx += 1;
     Ok(next_phi)
+}
+
+fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
+    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let g_r = pp.g.pow(&r);
+    for idx in 0..pp.degree {
+        if pp.t[idx] == g_r {
+            let c1 = pp.t[idx];
+            let c2 = pp.v[idx];
+            let m = el_gamal.decrypt(sk, c1, c2).unwrap();
+            if amount > m {
+                return Err("Withdraw exceeds balance".to_string());
+            }
+            let delta = c2 * (pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap() - Scalar::one());
+            let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
+            let next_phi = phi.add_affine(&multiplier);
+            pp.v[idx] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
+            return Ok(next_phi);
+        }
+    }
+    Err("Withdraw failed".to_string())
 }
 
 fn main() {

@@ -9,6 +9,15 @@ sol! {
     }
 }
 
+sol! {
+    struct PublicValuesWithdraw {
+        uint64 amount;
+        uint256 old_state;
+        uint256 new_state;
+        address A;
+    }
+}
+
 /// Compute the n'th fibonacci number (wrapping around on overflows), using normal Rust code.
 pub fn fibonacci(n: u32) -> (u32, u32) {
     let mut a = 0u32;

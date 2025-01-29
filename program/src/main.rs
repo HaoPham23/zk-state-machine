@@ -10,18 +10,6 @@ sp1_zkvm::entrypoint!(main);
 
 use alloy_sol_types::SolType;
 use fibonacci_lib::{fibonacci, PublicValuesStruct};
-use sp1_bls12_381::Scalar;
-
-fn deposit(pp: PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , phi: G1Affine) -> G1Affine {
-    unsafe {
-        let el_gamal = ElGamal::new(pp.r, pp.g);
-        let (t, v) = el_gamal.encrypt(pk_a, m_a, r_a);
-        let e = G1Affine::from(v * pp.g1_lagrange_basis[idx]);
-        let next_phi = phi.add_affine(&e);
-        idx += 1;
-        next_phi
-    }
-}
 
 pub fn main() {
     // Read an input to the program.
