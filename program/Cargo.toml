@@ -1,0 +1,12 @@
+[package]
+version = "0.1.0"
+name = "state-machine-program"
+edition = "2021"
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+kzg-rs = { workspace = true }
+sp1-zkvm = "4.0.0"
+fibonacci-lib = { path = "../lib" }
+sp1_bls12_381 = "0.8.0"
+ff = "0.13.0"
