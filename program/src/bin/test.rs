@@ -188,12 +188,40 @@ fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: 
     Err("Withdraw failed".to_string())
 }
 
+fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amount: u64, phi: G1Affine) -> Result<G1Affine, String> {
+    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let (idx_sender, idx_receiver) = (1, 0); // TODO: Need to find
+    let m = el_gamal.decrypt(sk_sender, pp.t[idx_sender], pp.v[idx_sender]).unwrap();
+    if amount > m {
+        return Err("Send exceeds balance".to_string());
+    }
+    let delta_sender = pp.v[idx_sender] * (pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap() - Scalar::one());
+    let delta_receiver = pp.v[idx_receiver] * (pp.g.pow(&[amount, 0, 0, 0]) - Scalar::one());
+    let multiplier_sender = G1Affine::from(pp.g1_lagrange_basis[idx_sender] * delta_sender);
+    let multiplier_receiver = G1Affine::from(pp.g1_lagrange_basis[idx_receiver] * delta_receiver);
+    let next_phi = phi.add_affine(&multiplier_sender).add_affine(&multiplier_receiver);
+    pp.v[idx_sender] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
+    pp.v[idx_receiver] *= pp.g.pow(&[amount, 0, 0, 0]);
+    Ok(next_phi)
+}
+
+fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
+    *time += 1;
+    println!("At time t = {}:", *time);
+    println!("[+] phi_{} = {:?}", *time, phi);
+    // println!("[+] v = {:?}", pp.v);
+    // println!("[+] t = {:?}", pp.t);
+    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    assert_eq!(kzg.commit(pp.v.clone()).unwrap(), phi);
+}
+
 fn main() {
     let mut pp = PublicParams::setup(16);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
     println!("{:?}", phi);
+    let mut time = 0;
     let (skA, pkA) = key_gen(&pp);
     let (skB, pkB) = key_gen(&pp);
     println!("User A's public key: {:?}", pkA);
@@ -207,6 +235,32 @@ fn main() {
     println!("Update state...");
 
     phi = deposit(&mut pp, pkA, rA, mA, phi).unwrap();
-    println!("{:?}", phi);
+    print_state(phi, &pp, &mut time);
 
+    println!("User B deposits: {:?} ETH", mB);
+    println!("Update state...");
+
+    phi = deposit(&mut pp, pkB, rB, mB, phi).unwrap();
+    print_state(phi, &pp, &mut time);
+
+    let amount = 30u64;
+    println!("User B sends {:?} ETH to User A", amount);
+    println!("Update state...");
+
+    phi = send(&mut pp, skB, pkA, amount, phi).unwrap();
+    print_state(phi, &pp, &mut time);
+
+    println!("User A withdraws {:?} ETH", amount);
+    println!("Update state...");
+
+    let A = [0u8; 20]; // TODO: need address
+    phi = withdraw(&mut pp, skA, rA, amount, phi, A).unwrap();
+    print_state(phi, &pp, &mut time);
+
+    let amount = 101u64;
+    println!("User A withdraws {:?} ETH", amount);
+    println!("Update state...");
+
+    phi = withdraw(&mut pp, skA, rA, amount, phi, A).unwrap();
+    print_state(phi, &pp, &mut time);
 }
