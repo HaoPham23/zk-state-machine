@@ -1,7 +1,6 @@
 #[allow(unused)]
 use kzg_rs::{trusted_setup::KzgSettings, KzgError};
 use sp1_bls12_381::{Scalar, G1Affine, G2Affine};
-use alloy_sol_types::SolType;
 
 fn compute_lagrange_basis(tau: Scalar, domain: Vec<Scalar>) -> Result<Vec<G1Affine>, KzgError> {
     let mut basis: Vec<G1Affine> = Vec::new();
@@ -98,8 +97,8 @@ impl KZG {
 
     fn commit(&self, poly: Vec<Scalar>) -> Result<G1Affine, KzgError> {
         let mut commitment = G1Affine::identity();
-        for i in 0..poly.len() {
-            let coeff = G1Affine::from(self.g1_lagrange_basis[i] * poly[i]);
+        for (i, ai) in poly.iter().enumerate() {
+            let coeff = G1Affine::from(self.g1_lagrange_basis[i] * ai);
             commitment = commitment.add_affine(&coeff);
         }
         Ok(commitment)
@@ -107,14 +106,12 @@ impl KZG {
 }
 
 struct ElGamal {
-    p: Scalar,
     g: Scalar
 }
 
 impl ElGamal {
-    fn new(p: Scalar, g: Scalar) -> ElGamal {
+    fn new(g: Scalar) -> ElGamal {
         ElGamal {
-            p,
             g
         }
     }
@@ -147,7 +144,7 @@ impl ElGamal {
 }
 
 fn key_gen(pp: &PublicParams) -> ([u64; 4], Scalar) {
-    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let el_gamal = ElGamal::new(pp.g);
     let (sk, pk) = el_gamal.key_gen();
     (sk, pk)
 }
@@ -157,7 +154,7 @@ fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , phi: G
     if pp.idx >= pp.degree {
         return Err("Deposit failed".to_string());
     }
-    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let el_gamal = ElGamal::new(pp.g);
     let (t, v) = el_gamal.encrypt(pk_a, m_a, r_a);
     pp.t[pp.idx] = t;
     pp.v[pp.idx] = v;
@@ -168,7 +165,7 @@ fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , phi: G
 }
 
 fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
-    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let el_gamal = ElGamal::new(pp.g);
     let g_r = pp.g.pow(&r);
     for idx in 0..pp.degree {
         if pp.t[idx] == g_r {
@@ -189,7 +186,7 @@ fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: 
 }
 
 fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amount: u64, phi: G1Affine) -> Result<G1Affine, String> {
-    let el_gamal = ElGamal::new(pp.r, pp.g);
+    let el_gamal = ElGamal::new(pp.g);
     let (idx_sender, idx_receiver) = (1, 0); // TODO: Need to find
     let m = el_gamal.decrypt(sk_sender, pp.t[idx_sender], pp.v[idx_sender]).unwrap();
     if amount > m {
@@ -222,45 +219,51 @@ fn main() {
     let mut phi = kzg.commit(v).unwrap();
     println!("{:?}", phi);
     let mut time = 0;
-    let (skA, pkA) = key_gen(&pp);
-    let (skB, pkB) = key_gen(&pp);
-    println!("User A's public key: {:?}", pkA);
-    println!("User B's public key: {:?}", pkB);
-    println!("User B's secret key: {:?}", skB);
+    let (sk_a, pk_a) = key_gen(&pp);
+    let (sk_b, pk_b) = key_gen(&pp);
+    println!("User A's public key: {:?}", pk_a);
+    println!("User B's public key: {:?}", pk_b);
+    println!("User B's secret key: {:?}", sk_b);
 
-    let (mA, mB) = (100u64, 200u64);    
-    let (rA, rB) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
-    println!("User A generates random number r = {:?}", rA);
-    println!("User A deposits: {:?} ETH", mA);
+    let (m_a, m_b) = (100u64, 200u64);    
+    let (r_a, r_b) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
+    println!("User A generates random number r = {:?}", r_a);
+    println!("User A deposits: {:?} ETH", m_a);
     println!("Update state...");
 
-    phi = deposit(&mut pp, pkA, rA, mA, phi).unwrap();
+    phi = deposit(&mut pp, pk_a, r_a, m_a, phi).unwrap();
     print_state(phi, &pp, &mut time);
 
-    println!("User B deposits: {:?} ETH", mB);
+    println!("User B deposits: {:?} ETH", m_b);
     println!("Update state...");
 
-    phi = deposit(&mut pp, pkB, rB, mB, phi).unwrap();
+    phi = deposit(&mut pp, pk_b, r_b, m_b, phi).unwrap();
     print_state(phi, &pp, &mut time);
 
     let amount = 30u64;
     println!("User B sends {:?} ETH to User A", amount);
     println!("Update state...");
 
-    phi = send(&mut pp, skB, pkA, amount, phi).unwrap();
+    phi = send(&mut pp, sk_b, pk_a, amount, phi).unwrap();
     print_state(phi, &pp, &mut time);
 
     println!("User A withdraws {:?} ETH", amount);
     println!("Update state...");
 
     let A = [0u8; 20]; // TODO: need address
-    phi = withdraw(&mut pp, skA, rA, amount, phi, A).unwrap();
+    phi = withdraw(&mut pp, sk_a, r_a, amount, phi, A).unwrap();
     print_state(phi, &pp, &mut time);
 
     let amount = 101u64;
     println!("User A withdraws {:?} ETH", amount);
     println!("Update state...");
 
-    phi = withdraw(&mut pp, skA, rA, amount, phi, A).unwrap();
-    print_state(phi, &pp, &mut time);
+    let tmp = withdraw(&mut pp, sk_a, r_a, amount, phi, A);
+    match tmp {
+        Ok(_) => {
+            phi = tmp.unwrap();
+            print_state(phi, &pp, &mut time)
+        },
+        Err(e) => println!("ERROR, should panic: {}", e)
+    }
 }
