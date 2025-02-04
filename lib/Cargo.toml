@@ -1,7 +1,10 @@
 [package]
-name = "fibonacci-lib"
+name = "state-machine-lib"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 alloy-sol-types = { workspace = true }
+sp1_bls12_381 = "0.8.0"
+kzg-rs = { workspace = true }
+serde = { version = "1.0.217", features = ["derive"] }
