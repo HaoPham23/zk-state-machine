@@ -1,5 +1,6 @@
 use alloy_sol_types::sol;
 use kzg_rs::{trusted_setup::KzgSettings, KzgError};
+use serde::{Deserialize, Serialize};
 use sp1_bls12_381::{Scalar, G1Affine, G2Affine};
 
 fn compute_lagrange_basis(tau: Scalar, domain: Vec<Scalar>) -> Result<Vec<G1Affine>, KzgError> {
@@ -19,7 +20,7 @@ fn compute_lagrange_basis(tau: Scalar, domain: Vec<Scalar>) -> Result<Vec<G1Affi
 
 // TODO: define struct G1Affine for phi
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct PublicParams {
     pub degree: usize,
     pub p: Scalar,

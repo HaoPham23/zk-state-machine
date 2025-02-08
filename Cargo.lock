@@ -962,6 +962,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bls12_381"
+version = "0.8.0"
+source = "git+https://github.com/HaoPham23/bls12_381.git?branch=patch-v0.8.0#4b598899ce9f36fb01771e52b09b5c5c50b9b172"
+dependencies = [
+ "cfg-if",
+ "ff 0.13.0",
+ "group 0.13.0",
+ "pairing 0.23.0",
+ "rand_core",
+ "serde",
+ "sp1-lib 3.4.0",
+ "subtle",
+]
+
+[[package]]
 name = "blst"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2308,7 +2323,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a575df5f985fe1cd5b2b05664ff6accfc46559032b954529fd225a2168d27b0f"
 dependencies = [
  "bitvec",
- "bls12_381",
+ "bls12_381 0.7.1",
  "ff 0.12.1",
  "group 0.12.1",
  "rand_core",
@@ -2351,13 +2366,12 @@ dependencies = [
 [[package]]
 name = "kzg-rs"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0850eb19206463a61bede4f7b7e6b21731807137619044b1f3c287ebcfe2b3b0"
+source = "git+https://github.com/HaoPham23/kzg-rs.git?branch=master#04cb739031abe9317ebdc1ae9ebeedc6dff51cbf"
 dependencies = [
+ "bls12_381 0.8.0",
  "ff 0.13.0",
  "hex",
  "sha2",
- "sp1_bls12_381",
  "spin",
 ]
 
@@ -4316,16 +4330,12 @@ dependencies = [
 
 [[package]]
 name = "sp1-lib"
-version = "1.2.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea7811abd2d3a991007fcb284f41152840b8388c171288d0c52c6793956609c"
+checksum = "7a5729da1b05d56c01457e5ecabdc77f1cc941df23f2921163a2f325aec22428"
 dependencies = [
- "anyhow",
  "bincode",
- "cfg-if",
- "hex",
  "serde",
- "snowbridge-amcl",
 ]
 
 [[package]]
@@ -4635,21 +4645,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sp1_bls12_381"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27c4b8901334dc09099dd82f80a72ddfc76b0046f4b342584c808f1931bed5a"
-dependencies = [
- "cfg-if",
- "ff 0.13.0",
- "group 0.13.0",
- "pairing 0.23.0",
- "rand_core",
- "sp1-lib 1.2.0",
- "subtle",
-]
-
-[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4670,9 +4665,9 @@ name = "state-machine-lib"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types 0.7.7",
+ "bls12_381 0.8.0",
  "kzg-rs",
  "serde",
- "sp1_bls12_381",
 ]
 
 [[package]]
@@ -4680,9 +4675,9 @@ name = "state-machine-program"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types 0.7.7",
+ "bls12_381 0.8.0",
  "kzg-rs",
  "sp1-zkvm",
- "sp1_bls12_381",
  "state-machine-lib",
 ]
 
@@ -5807,7 +5802,7 @@ dependencies = [
  "ark-std 0.4.0",
  "bitvec",
  "blake2",
- "bls12_381",
+ "bls12_381 0.7.1",
  "byteorder",
  "cfg-if",
  "group 0.12.1",

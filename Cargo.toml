@@ -8,4 +8,9 @@ resolver = "2"
 
 [workspace.dependencies]
 alloy-sol-types = "0.7.7"
-kzg-rs = "0.2.3" 
+kzg-rs = { git = "https://github.com/HaoPham23/kzg-rs.git", branch = "master" }
+sp1_bls12_381 = { package = "bls12_381",  git = "https://github.com/HaoPham23/bls12_381.git", branch = "patch-v0.8.0" , default-features = false, features = [
+    "groups",
+    "pairings",
+    "alloc",
+] }
