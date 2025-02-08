@@ -1,6 +1,6 @@
 #[allow(unused)]
 use state_machine_lib::{PublicParams, KZG, key_gen, deposit, send, withdraw};
-use bls12_381::{Scalar, G1Affine};
+use sp1_bls12_381::{Scalar, G1Affine};
 
 fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
     *time += 1;

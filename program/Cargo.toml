@@ -8,4 +8,4 @@ alloy-sol-types = { workspace = true }
 kzg-rs = { workspace = true }
 sp1-zkvm = "4.0.0"
 state-machine-lib = { path = "../lib" }
-sp1_bls12_381 = "0.8.0"
+sp1_bls12_381 = { workspace = true }
