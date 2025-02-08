@@ -12,7 +12,8 @@
 
 use alloy_sol_types::SolType;
 use clap::Parser;
-use state_machine_lib::PublicValuesStruct;
+use state_machine_lib::{PublicParams, PublicValuesStruct, KZG, key_gen, Action, Deposit};
+use sp1_bls12_381::{G1Affine, Scalar};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -28,8 +29,6 @@ struct Args {
     #[clap(long)]
     prove: bool,
 
-    #[clap(long, default_value = "20")]
-    n: u32,
 }
 
 fn main() {
@@ -48,11 +47,36 @@ fn main() {
     // Setup the prover client.
     let client = ProverClient::from_env();
 
+    let mut pp = PublicParams::setup(16);
+    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let v = vec![Scalar::zero(); pp.degree];
+    let mut phi = kzg.commit(v).unwrap();
+
+    let (sk_a, pk_a) = key_gen(&pp);
+    let (sk_b, pk_b) = key_gen(&pp);
+    println!("User A's public key: {:?}", pk_a);
+    println!("User B's public key: {:?}", pk_b);
+    println!("User B's secret key: {:?}", sk_b);
+
+    let (m_a, m_b) = (100u64, 200u64);    
+    let (r_a, r_b) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
+    println!("User A generates random number r = {:?}", r_a);
+    println!("User A deposits: {:?} ETH", m_a);
+    println!("Update state...");
+
+    let deposit_inputs = Deposit {
+        pkey: pk_a,
+        random: r_a,
+        amount: m_a,
+    };
+
+    let action = Action::Deposit(deposit_inputs);
+
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    stdin.write(&args.n);
-
-    println!("n: {}", args.n);
+    stdin.write(&action);
+    stdin.write(&phi);
+    stdin.write(&pp);
 
     if args.execute {
         // Execute the program
@@ -61,8 +85,9 @@ fn main() {
 
         // Read the output.
         let decoded = PublicValuesStruct::abi_decode(output.as_slice(), true).unwrap();
-        let PublicValuesStruct { x } = decoded;
-        println!("x: {}", x);
+        let PublicValuesStruct {old_phi, next_phi } = decoded;
+        println!("old_phi: {:?}", G1Affine::from_compressed(&old_phi));
+        println!("next_phi: {:?}", G1Affine::from_compressed(&next_phi));
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());

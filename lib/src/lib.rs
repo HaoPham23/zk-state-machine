@@ -1,5 +1,5 @@
 use alloy_sol_types::sol;
-use kzg_rs::{trusted_setup::KzgSettings, KzgError};
+use kzg_rs::KzgError;
 use serde::{Deserialize, Serialize};
 use sp1_bls12_381::{Scalar, G1Affine, G2Affine};
 
@@ -121,7 +121,6 @@ impl ElGamal {
 
     pub fn key_gen(&self) -> ([u64; 4], Scalar) {
         let sk = [0x3039u64, 0, 0, 0]; // TODO: need random
-        println!("sk: {:?}", sk);
         let pk = self.g.pow(&sk);
         (sk, pk)
     }
@@ -208,7 +207,9 @@ pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amo
 sol! {
     /// The public values encoded as a struct that can be easily deserialized inside Solidity.
     struct PublicValuesStruct {
-        uint32 x;
+        uint8[48] old_phi;
+        uint8[48] next_phi;
+        // TODO add more public values here
     }
 }
 
@@ -231,4 +232,34 @@ pub fn fibonacci(n: u32) -> (u32, u32) {
         b = c;
     }
     (a, b)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Deposit {
+    pub amount: u64,
+    pub pkey: Scalar,
+    pub random: [u64; 4],
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Send {
+    pub amount: u64,
+    pub skey_sender: [u64; 4],
+    pub pkey_receiver: Scalar,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Withdraw {
+    pub amount: u64,
+    pub skey: [u64; 4],
+    pub random: [u64; 4],
+    pub recipient: [u8; 20],
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Action {
+    Deposit(Deposit),
+    Send(Send),
+    Withdraw(Withdraw),
+    Rotate { new_key: G1Affine },
 }
