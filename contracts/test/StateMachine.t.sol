@@ -8,14 +8,14 @@ import {StateMachineVerifier} from "../src/StateMachineVerifier.sol";
 import {SP1VerifierGateway} from "@sp1-contracts/SP1VerifierGateway.sol";
 
 struct SP1ProofDepositFixtureJson {
-    bytes old_phi;
-    bytes next_phi;
     uint64 amount;
+    bytes next_phi;
+    bytes old_phi;
     bytes32 pkey;
+    bytes proof;
+    bytes public_values;
     bytes32 v;
     bytes32 vkey;
-    bytes publicValues;
-    bytes proof;
 }
 
 contract StateMachineGroth16Test is Test {
@@ -29,8 +29,7 @@ contract StateMachineGroth16Test is Test {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/src/fixtures/groth16-zk-state-machine-fixture.json");
         string memory json = vm.readFile(path);
-        bytes memory jsonBytes = json.parseRaw(".");
-        console.logBytes(jsonBytes);
+        bytes memory jsonBytes = vm.parseJson(json);
         return abi.decode(jsonBytes, (SP1ProofDepositFixtureJson));
     }
 
@@ -42,27 +41,25 @@ contract StateMachineGroth16Test is Test {
         stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
     }
 
-    function test() public {}
+    function test_ValidStateMachineVerifierProof() public {
+        SP1ProofDepositFixtureJson memory fixture = loadFixture();
 
-    // function test_ValidStateMachineVerifierProof() public {
-    //     SP1ProofDepositFixtureJson memory fixture = loadFixture();
+        vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
 
-    //     vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fixture.proof);
+        assert(keccak256(old_phi) == keccak256(fixture.old_phi));
+        assert(keccak256(next_phi) == keccak256(fixture.next_phi));
+        assert(amount == fixture.amount);
+        assert(pkey == fixture.pkey);
+        assert(v == fixture.v);
+    }
 
-    //     (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.publicValues, fixture.proof);
-    //     assert(keccak256(old_phi) == keccak256(fixture.old_phi));
-    //     assert(keccak256(next_phi) == keccak256(fixture.next_phi));
-    //     assert(amount == fixture.amount);
-    //     assert(pkey == fixture.pkey);
-    //     assert(v == fixture.v);
-    // }
+    function testFail_InvalidStateMachineVerifierProof() public view {
+        SP1ProofDepositFixtureJson memory fixture = loadFixture();
 
-    // function testFail_InvalidStateMachineVerifierProof() public view {
-    //     SP1ProofDepositFixtureJson memory fixture = loadFixture();
+        // Create a fake proof.
+        bytes memory fakeProof = new bytes(fixture.proof.length);
 
-    //     // Create a fake proof.
-    //     bytes memory fakeProof = new bytes(fixture.proof.length);
-
-    //     stateMachineVerifier.verifyStateMachineDepositProof(fixture.publicValues, fakeProof);
-    // }
+        stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fakeProof);
+    }
 }
