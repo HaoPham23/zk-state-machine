@@ -2,6 +2,7 @@ use alloy_sol_types::sol;
 use kzg_rs::KzgError;
 use serde::{Deserialize, Serialize};
 use sp1_bls12_381::{Scalar, G1Affine, G2Affine};
+use std::collections::HashMap;
 
 fn compute_lagrange_basis(tau: Scalar, domain: Vec<Scalar>) -> Result<Vec<G1Affine>, KzgError> {
     let mut basis: Vec<G1Affine> = Vec::new();
@@ -32,6 +33,8 @@ pub struct PublicParams {
     pub idx: usize,
     pub v: Vec<Scalar>,
     pub t: Vec<Scalar>,
+    pub pkeys: Vec<Scalar>,
+    pub index_of: HashMap<[u8; 32], usize>,
 }
 
 impl PublicParams {
@@ -47,6 +50,8 @@ impl PublicParams {
             idx: 0,
             v: vec![Scalar::zero(); degree],
             t: vec![Scalar::zero(); degree],
+            pkeys: Vec::new(),
+            index_of: HashMap::new(),
         }
     }
 
@@ -78,6 +83,8 @@ impl PublicParams {
             idx: 0,
             v: vec![Scalar::zero(); degree],
             t: vec![Scalar::zero(); degree],
+            pkeys: Vec::new(),
+            index_of: HashMap::new(),
         }
     }
 }
@@ -119,10 +126,8 @@ impl ElGamal {
         }
     }
 
-    pub fn key_gen(&self) -> ([u64; 4], Scalar) {
-        let sk = [0x3039u64, 0, 0, 0]; // TODO: need random
-        let pk = self.g.pow(&sk);
-        (sk, pk)
+    pub fn from_skey(&self, sk: [u64; 4]) -> Scalar {
+        self.g.pow(&sk)
     }
 
     pub fn encrypt(&self, pk: Scalar, m: u64, r: [u64; 4]) -> (Scalar, Scalar) {
@@ -145,12 +150,6 @@ impl ElGamal {
     }
 }
 
-pub fn key_gen(pp: &PublicParams) -> ([u64; 4], Scalar) {
-    let el_gamal = ElGamal::new(pp.g);
-    let (sk, pk) = el_gamal.key_gen();
-    (sk, pk)
-}
-
 pub fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , phi: G1Affine) -> Result<G1Affine, String> {
     if pp.idx >= pp.degree {
         return Err("Deposit failed".to_string());
@@ -159,6 +158,8 @@ pub fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , ph
     let (t, v) = el_gamal.encrypt(pk_a, m_a, r_a);
     pp.t[pp.idx] = t;
     pp.v[pp.idx] = v;
+    pp.pkeys.push(pk_a);
+    pp.index_of.insert(pk_a.to_bytes(), pp.idx);
     let e = G1Affine::from(v * pp.g1_lagrange_basis[pp.idx]);
     let next_phi = phi.add_affine(&e);
     pp.idx += 1;
@@ -168,27 +169,43 @@ pub fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , ph
 pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
     let el_gamal = ElGamal::new(pp.g);
     let g_r = pp.g.pow(&r);
-    for idx in 0..pp.degree {
-        if pp.t[idx] == g_r {
-            let c1 = pp.t[idx];
-            let c2 = pp.v[idx];
-            let m = el_gamal.decrypt(sk, c1, c2).unwrap();
-            if amount > m {
-                return Err("Withdraw exceeds balance".to_string());
-            }
-            let delta = c2 * (pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap() - Scalar::one());
-            let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
-            let next_phi = phi.add_affine(&multiplier);
-            pp.v[idx] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
-            return Ok(next_phi);
-        }
+    let pk = el_gamal.from_skey(sk);
+    let idx = match pp.index_of.get(&pk.to_bytes()) {
+        Some(idx) => *idx,
+        None => return Err("Public key not found".to_string())
+    };
+    if idx >= pp.degree || pp.t[idx] != g_r {
+        return Err("Withdraw failed".to_string());
     }
-    Err("Withdraw failed".to_string())
+    let c1 = pp.t[idx];
+    let c2 = pp.v[idx];
+    let m = el_gamal.decrypt(sk, c1, c2).unwrap();
+    if amount > m {
+        return Err("Withdraw exceeds balance".to_string());
+    }
+    let delta = c2 * (pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap() - Scalar::one());
+    let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
+    let next_phi = phi.add_affine(&multiplier);
+    pp.v[idx] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
+    Ok(next_phi)
 }
 
 pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amount: u64, phi: G1Affine) -> Result<G1Affine, String> {
     let el_gamal = ElGamal::new(pp.g);
-    let (idx_sender, idx_receiver) = (1, 0); // TODO: Need to find
+    let pk_sender = el_gamal.from_skey(sk_sender);
+    let idx_sender = match pp.index_of.get(&pk_sender.to_bytes()) {
+        Some(idx) => *idx,
+        None => return Err("Public key not found!".to_string())
+    };
+    let idx_receiver = match pp.index_of.get(&pk_receiver.to_bytes()) {
+        Some(idx) => *idx,
+        None => return Err("Public key not found".to_string())
+    };
+    println!("idx_sender: {:?}", idx_sender);
+    println!("idx_receiver: {:?}", idx_receiver);
+    if idx_sender >= pp.degree || idx_receiver >= pp.degree {
+        return Err("Send failed".to_string());
+    }
     let m = el_gamal.decrypt(sk_sender, pp.t[idx_sender], pp.v[idx_sender]).unwrap();
     if amount > m {
         return Err("Send exceeds balance".to_string());
@@ -200,6 +217,21 @@ pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amo
     let next_phi = phi.add_affine(&multiplier_sender).add_affine(&multiplier_receiver);
     pp.v[idx_sender] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
     pp.v[idx_receiver] *= pp.g.pow(&[amount, 0, 0, 0]);
+    Ok(next_phi)
+}
+
+pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], phi: G1Affine) -> Result<G1Affine, String> {
+    let el_gamal = ElGamal::new(pp.g);
+    let pkey = el_gamal.from_skey(skey);
+    let idx = match pp.index_of.get(&pkey.to_bytes()) {
+        Some(idx) => *idx,
+        None => return Err("Public key not found".to_string())
+    };
+    let delta = pp.v[idx] * (pkey.pow(&new_additive) - Scalar::one());
+    let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
+    let next_phi = phi.add_affine(&multiplier);
+    pp.t[idx] *= pp.g.pow(&new_additive);
+    pp.v[idx] *= pkey.pow(&new_additive);
     Ok(next_phi)
 }
 
@@ -221,19 +253,6 @@ sol! {
         address A;
     }
 }
-
-/// Compute the n'th fibonacci number (wrapping around on overflows), using normal Rust code.
-pub fn fibonacci(n: u32) -> (u32, u32) {
-    let mut a = 0u32;
-    let mut b = 1u32;
-    for _ in 0..n {
-        let c = a.wrapping_add(b);
-        a = b;
-        b = c;
-    }
-    (a, b)
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Deposit {
     pub amount: u64,

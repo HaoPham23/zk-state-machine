@@ -12,7 +12,7 @@
 
 use alloy_sol_types::SolType;
 use clap::Parser;
-use state_machine_lib::{PublicParams, PublicValuesStruct, KZG, key_gen, Action, Deposit};
+use state_machine_lib::{ElGamal, PublicParams, PublicValuesStruct, KZG, Action, Deposit};
 use sp1_bls12_381::{G1Affine, Scalar};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
@@ -48,12 +48,15 @@ fn main() {
     let client = ProverClient::from_env();
 
     let mut pp = PublicParams::setup(16);
+    let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
 
-    let (sk_a, pk_a) = key_gen(&pp);
-    let (sk_b, pk_b) = key_gen(&pp);
+    let sk_a = [1u64, 2, 3, 4];
+    let pk_a = el_gamal.from_skey(sk_a);
+    let sk_b = [5u64, 6, 7, 8];
+    let pk_b = el_gamal.from_skey(sk_b);
     println!("User A's public key: {:?}", pk_a);
     println!("User B's public key: {:?}", pk_b);
     println!("User B's secret key: {:?}", sk_b);

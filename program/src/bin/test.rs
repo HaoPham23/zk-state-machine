@@ -1,5 +1,6 @@
+use state_machine_lib::ElGamal;
 #[allow(unused)]
-use state_machine_lib::{PublicParams, KZG, key_gen, deposit, send, withdraw};
+use state_machine_lib::{PublicParams, KZG, deposit, send, withdraw, rotate};
 use sp1_bls12_381::{Scalar, G1Affine};
 
 fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
@@ -14,13 +15,17 @@ fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
 
 fn main() {
     let mut pp = PublicParams::setup(16);
+    let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
     println!("{:?}", phi);
     let mut time = 0;
-    let (sk_a, pk_a) = key_gen(&pp);
-    let (sk_b, pk_b) = key_gen(&pp);
+    let sk_a = [1u64, 2, 3, 4];
+    let pk_a = el_gamal.from_skey(sk_a);
+    let sk_b = [5u64, 6, 7, 8];
+    let pk_b = el_gamal.from_skey(sk_b);
+
     println!("User A's public key: {:?}", pk_a);
     println!("User B's public key: {:?}", pk_b);
     println!("User B's secret key: {:?}", sk_b);
@@ -66,4 +71,27 @@ fn main() {
         },
         Err(e) => println!("ERROR, should panic: {}", e)
     }
+
+    let add_additive = [1u64, 0, 0, 0];
+    let new_r = [0x1112u64, 0, 0, 0]; // = r_a + add_additive
+    println!("User A rotates his secret");
+    println!("Update state...");
+    phi = rotate(&mut pp, sk_a, add_additive, phi).unwrap();
+    print_state(phi, &pp, &mut time);
+
+    println!("User A withdraws {:?} ETH using old secret", amount);
+    println!("Update state...");
+    let tmp = withdraw(&mut pp, sk_a, r_a, amount, phi, A);
+    match tmp {
+        Ok(_) => {
+            phi = tmp.unwrap();
+            print_state(phi, &pp, &mut time)
+        },
+        Err(e) => println!("ERROR, should panic: {}", e)
+    }
+
+    println!("User A withdraws {:?} ETH using new secret", 100);
+    println!("Update state...");
+    phi = withdraw(&mut pp, sk_a, new_r, 100, phi, A).unwrap();
+    print_state(phi, &pp, &mut time);
 }
