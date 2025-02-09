@@ -238,21 +238,32 @@ pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], ph
 
 sol! {
     /// The public values encoded as a struct that can be easily deserialized inside Solidity.
-    struct PublicValuesStruct {
+    struct PublicValuesDeposit {
         uint8[48] old_phi;
         uint8[48] next_phi;
-        // TODO add more public values here
+        uint256 amount;
+        uint8[32] pkey;
+        uint8[32] v;
+    }
+
+    struct PublicValuesSend {
+        uint8[48] old_phi;
+        uint8[48] next_phi;
+    }
+
+    struct PublicValuesWithdraw {
+        uint8[48] old_phi;
+        uint8[48] next_phi;
+        uint256 amount;
+        address recipient;
+    }
+
+    struct PublicValuesRotate {
+        uint8[48] old_phi;
+        uint8[48] next_phi;
     }
 }
 
-sol! {
-    struct PublicValuesWithdraw {
-        uint64 amount;
-        uint256 old_state;
-        uint256 new_state;
-        address A;
-    }
-}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Deposit {
     pub amount: u64,
@@ -276,9 +287,15 @@ pub struct Withdraw {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Rotate {
+    pub skey: [u64; 4],
+    pub new_additive: [u64; 4],
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
     Deposit(Deposit),
     Send(Send),
     Withdraw(Withdraw),
-    Rotate { new_key: G1Affine },
+    Rotate(Rotate),
 }

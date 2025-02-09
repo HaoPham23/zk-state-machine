@@ -12,7 +12,7 @@
 
 use alloy_sol_types::SolType;
 use clap::Parser;
-use state_machine_lib::{ElGamal, PublicParams, PublicValuesStruct, KZG, Action, Deposit};
+use state_machine_lib::{ElGamal, PublicParams, PublicValuesDeposit, PublicValuesWithdraw, PublicValuesSend, PublicValuesRotate, KZG, Action, Deposit};
 use sp1_bls12_381::{G1Affine, Scalar};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
@@ -47,11 +47,11 @@ fn main() {
     // Setup the prover client.
     let client = ProverClient::from_env();
 
-    let mut pp = PublicParams::setup(16);
+    let pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
-    let mut phi = kzg.commit(v).unwrap();
+    let phi = kzg.commit(v).unwrap();
 
     let sk_a = [1u64, 2, 3, 4];
     let pk_a = el_gamal.from_skey(sk_a);
@@ -87,8 +87,13 @@ fn main() {
         println!("Program executed successfully.");
 
         // Read the output.
-        let decoded = PublicValuesStruct::abi_decode(output.as_slice(), true).unwrap();
-        let PublicValuesStruct {old_phi, next_phi } = decoded;
+        let decoded = PublicValuesDeposit::abi_decode(output.as_slice(), true).unwrap();
+        let PublicValuesDeposit {
+            old_phi, 
+            next_phi, 
+            amount, 
+            pkey, 
+            v } = decoded;
         println!("old_phi: {:?}", G1Affine::from_compressed(&old_phi));
         println!("next_phi: {:?}", G1Affine::from_compressed(&next_phi));
 
