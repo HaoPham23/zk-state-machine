@@ -137,14 +137,11 @@ impl ElGamal {
         (c1, c2)
     }
 
-    pub fn decrypt(&self, sk: [u64; 4], c1: Scalar, c2: Scalar) -> Result<u64, String> {
+    pub fn decrypt(&self, sk: [u64; 4], c1: Scalar, c2: Scalar, x: u64) -> Result<u64, String> {
         let c1_pow_sk_inv = c1.pow(&sk).invert().unwrap();
         let c2_div_c1 = c2 * c1_pow_sk_inv;
-        for m in 0..1000 {
-            let exp = [m, 0, 0, 0];
-            if self.g.pow(&exp) == c2_div_c1 {
-                return Ok(m);
-            }
+        if self.g.pow(&[x, 0, 0, 0]) == c2_div_c1 {
+            return Ok(x);
         }
         Err("Decryption failed".to_string())
     }
@@ -166,7 +163,7 @@ pub fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , ph
     Ok(next_phi)
 }
 
-pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
+pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], balance: u64,  amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
     let el_gamal = ElGamal::new(pp.g);
     let g_r = pp.g.pow(&r);
     let pk = el_gamal.from_skey(sk);
@@ -179,7 +176,7 @@ pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, p
     }
     let c1 = pp.t[idx];
     let c2 = pp.v[idx];
-    let m = el_gamal.decrypt(sk, c1, c2).unwrap();
+    let m = el_gamal.decrypt(sk, c1, c2, balance).unwrap();
     if amount > m {
         return Err("Withdraw exceeds balance".to_string());
     }
@@ -190,7 +187,7 @@ pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], amount: u64, p
     Ok(next_phi)
 }
 
-pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amount: u64, phi: G1Affine) -> Result<G1Affine, String> {
+pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, balance: u64, amount: u64, phi: G1Affine) -> Result<G1Affine, String> {
     let el_gamal = ElGamal::new(pp.g);
     let pk_sender = el_gamal.from_skey(sk_sender);
     let idx_sender = match pp.index_of.get(&pk_sender.to_bytes()) {
@@ -206,7 +203,7 @@ pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, amo
     if idx_sender >= pp.degree || idx_receiver >= pp.degree {
         return Err("Send failed".to_string());
     }
-    let m = el_gamal.decrypt(sk_sender, pp.t[idx_sender], pp.v[idx_sender]).unwrap();
+    let m = el_gamal.decrypt(sk_sender, pp.t[idx_sender], pp.v[idx_sender], balance).unwrap();
     if amount > m {
         return Err("Send exceeds balance".to_string());
     }
@@ -239,28 +236,28 @@ pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], ph
 sol! {
     /// The public values encoded as a struct that can be easily deserialized inside Solidity.
     struct PublicValuesDeposit {
-        uint8[48] old_phi;
-        uint8[48] next_phi;
+        bytes old_phi;
+        bytes next_phi;
         uint256 amount;
-        uint8[32] pkey;
-        uint8[32] v;
+        bytes32 pkey;
+        bytes32 v;
     }
 
     struct PublicValuesSend {
-        uint8[48] old_phi;
-        uint8[48] next_phi;
+        bytes old_phi;
+        bytes next_phi;
     }
 
     struct PublicValuesWithdraw {
-        uint8[48] old_phi;
-        uint8[48] next_phi;
+        bytes old_phi;
+        bytes next_phi;
         uint256 amount;
         address recipient;
     }
 
     struct PublicValuesRotate {
-        uint8[48] old_phi;
-        uint8[48] next_phi;
+        bytes old_phi;
+        bytes next_phi;
     }
 }
 
@@ -273,6 +270,7 @@ pub struct Deposit {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Send {
+    pub balance_sender: u64,
     pub amount: u64,
     pub skey_sender: [u64; 4],
     pub pkey_receiver: Scalar,
@@ -280,6 +278,7 @@ pub struct Send {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Withdraw {
+    pub balance: u64,
     pub amount: u64,
     pub skey: [u64; 4],
     pub random: [u64; 4],

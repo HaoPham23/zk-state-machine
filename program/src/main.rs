@@ -26,27 +26,27 @@ pub fn main() {
             // Handle deposit
             let next_phi = deposit(&mut pp, deposit_inputs.pkey, deposit_inputs.random, deposit_inputs.amount, phi).unwrap();
             PublicValuesDeposit::abi_encode(&PublicValuesDeposit {
-                old_phi: phi.to_compressed(),
-                next_phi: next_phi.to_compressed(),
+                old_phi: phi.to_compressed().into(),
+                next_phi: next_phi.to_compressed().into(),
                 amount: alloy_sol_types::private::u256(deposit_inputs.amount),
-                pkey: deposit_inputs.pkey.to_bytes(),
-                v: pp.v[pp.idx - 1].to_bytes()
+                pkey: deposit_inputs.pkey.to_bytes().into(),
+                v: pp.v[pp.idx - 1].to_bytes().into()
             })
         },
         Action::Send(send_inputs) => {
             // Handle send
-            let next_phi = send(&mut pp, send_inputs.skey_sender, send_inputs.pkey_receiver, send_inputs.amount, phi).unwrap();
+            let next_phi = send(&mut pp, send_inputs.skey_sender, send_inputs.pkey_receiver, send_inputs.balance_sender, send_inputs.amount, phi).unwrap();
             PublicValuesSend::abi_encode(&PublicValuesSend {
-                old_phi: phi.to_compressed(),
-                next_phi: next_phi.to_compressed(),
+                old_phi: phi.to_compressed().into(),
+                next_phi: next_phi.to_compressed().into(),
             })
         },
         Action::Withdraw(withdraw_inputs) => {
             // Handle withdraw
-            let next_phi = withdraw(&mut pp, withdraw_inputs.skey, withdraw_inputs.random, withdraw_inputs.amount, phi, withdraw_inputs.recipient).unwrap();
+            let next_phi = withdraw(&mut pp, withdraw_inputs.skey, withdraw_inputs.random, withdraw_inputs.balance, withdraw_inputs.amount, phi, withdraw_inputs.recipient).unwrap();
             PublicValuesWithdraw::abi_encode(&PublicValuesWithdraw {
-                old_phi: phi.to_compressed(),
-                next_phi: next_phi.to_compressed(),
+                old_phi: phi.to_compressed().into(),
+                next_phi: next_phi.to_compressed().into(),
                 amount: alloy_sol_types::private::u256(withdraw_inputs.amount),
                 recipient: alloy_sol_types::private::Address::from(withdraw_inputs.recipient)
             })
@@ -55,8 +55,8 @@ pub fn main() {
             // Handle rotate
             let next_phi = rotate(&mut pp, rotate_inputs.skey, rotate_inputs.new_additive, phi).unwrap();
             PublicValuesRotate::abi_encode(&PublicValuesRotate {
-                old_phi: phi.to_compressed(),
-                next_phi: next_phi.to_compressed(),
+                old_phi: phi.to_compressed().into(),
+                next_phi: next_phi.to_compressed().into(),
             })
         },
     };

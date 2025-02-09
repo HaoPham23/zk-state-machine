@@ -30,7 +30,7 @@ fn main() {
     println!("User B's public key: {:?}", pk_b);
     println!("User B's secret key: {:?}", sk_b);
 
-    let (m_a, m_b) = (100u64, 200u64);    
+    let (mut m_a, mut m_b) = (100u64, 200u64);    
     let (r_a, r_b) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
     println!("User A generates random number r = {:?}", r_a);
     println!("User A deposits: {:?} ETH", m_a);
@@ -49,21 +49,24 @@ fn main() {
     println!("User B sends {:?} ETH to User A", amount);
     println!("Update state...");
 
-    phi = send(&mut pp, sk_b, pk_a, amount, phi).unwrap();
+    phi = send(&mut pp, sk_b, pk_a, m_b, amount, phi).unwrap();
     print_state(phi, &pp, &mut time);
+    m_b -= amount;
+    m_a += amount;
 
     println!("User A withdraws {:?} ETH", amount);
     println!("Update state...");
 
     let A = [0u8; 20]; // TODO: need address
-    phi = withdraw(&mut pp, sk_a, r_a, amount, phi, A).unwrap();
+    phi = withdraw(&mut pp, sk_a, r_a, m_a, amount, phi, A).unwrap();
     print_state(phi, &pp, &mut time);
+    m_a -= amount;
 
     let amount = 101u64;
     println!("User A withdraws {:?} ETH", amount);
     println!("Update state...");
 
-    let tmp = withdraw(&mut pp, sk_a, r_a, amount, phi, A);
+    let tmp = withdraw(&mut pp, sk_a, r_a, m_a, amount, phi, A);
     match tmp {
         Ok(_) => {
             phi = tmp.unwrap();
@@ -81,7 +84,7 @@ fn main() {
 
     println!("User A withdraws {:?} ETH using old secret", amount);
     println!("Update state...");
-    let tmp = withdraw(&mut pp, sk_a, r_a, amount, phi, A);
+    let tmp = withdraw(&mut pp, sk_a, r_a, m_a, amount, phi, A);
     match tmp {
         Ok(_) => {
             phi = tmp.unwrap();
@@ -92,6 +95,6 @@ fn main() {
 
     println!("User A withdraws {:?} ETH using new secret", 100);
     println!("Update state...");
-    phi = withdraw(&mut pp, sk_a, new_r, 100, phi, A).unwrap();
+    phi = withdraw(&mut pp, sk_a, new_r, m_a, 100, phi, A).unwrap();
     print_state(phi, &pp, &mut time);
 }

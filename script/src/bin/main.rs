@@ -94,8 +94,8 @@ fn main() {
             amount, 
             pkey, 
             v } = decoded;
-        println!("old_phi: {:?}", G1Affine::from_compressed(&old_phi));
-        println!("next_phi: {:?}", G1Affine::from_compressed(&next_phi));
+        println!("old_phi: {:?}", G1Affine::from_compressed(old_phi.as_ref().try_into().unwrap()));
+        println!("next_phi: {:?}", G1Affine::from_compressed(next_phi.as_ref().try_into().unwrap()));
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());

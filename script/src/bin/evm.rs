@@ -12,7 +12,8 @@
 
 use alloy_sol_types::SolType;
 use clap::{Parser, ValueEnum};
-use state_machine_lib::PublicValuesStruct;
+use state_machine_lib::{PublicParams, PublicValuesDeposit, KZG, ElGamal, Action, Deposit};
+use sp1_bls12_381::Scalar;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{
     include_elf, HashableKey, ProverClient, SP1ProofWithPublicValues, SP1Stdin, SP1VerifyingKey,
@@ -20,7 +21,7 @@ use sp1_sdk::{
 use std::path::PathBuf;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const FIBONACCI_ELF: &[u8] = include_elf!("state-machine-program");
+pub const STATEMACHINE_ELF: &[u8] = include_elf!("state-machine-program");
 
 /// The arguments for the EVM command.
 #[derive(Parser, Debug)]
@@ -51,6 +52,19 @@ struct SP1FibonacciProofFixture {
     proof: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SP1ProofDepositFixture {
+    old_phi: String,
+    next_phi: String,
+    amount: u64,
+    pkey: String,
+    v: String,
+    vkey: String,
+    public_values: String,
+    proof: String,
+}
+
 fn main() {
     // Setup the logger.
     sp1_sdk::utils::setup_logger();
@@ -62,13 +76,45 @@ fn main() {
     let client = ProverClient::from_env();
 
     // Setup the program.
-    let (pk, vk) = client.setup(FIBONACCI_ELF);
+    let (pk, vk) = client.setup(STATEMACHINE_ELF);
+
+    // Setup the prover client.
+    let client = ProverClient::from_env();
+
+    let pp = PublicParams::setup(16);
+    let el_gamal = ElGamal::new(pp.g);
+    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let v = vec![Scalar::zero(); pp.degree];
+    let phi = kzg.commit(v).unwrap();
+
+    let sk_a = [1u64, 2, 3, 4];
+    let pk_a = el_gamal.from_skey(sk_a);
+    let sk_b = [5u64, 6, 7, 8];
+    let pk_b = el_gamal.from_skey(sk_b);
+    println!("User A's public key: {:?}", pk_a);
+    println!("User B's public key: {:?}", pk_b);
+    println!("User B's secret key: {:?}", sk_b);
+
+    let (m_a, m_b) = (100u64, 200u64);    
+    let (r_a, r_b) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
+    println!("User A generates random number r = {:?}", r_a);
+    println!("User A deposits: {:?} ETH", m_a);
+    println!("Update state...");
+
+    let deposit_inputs = Deposit {
+        pkey: pk_a,
+        random: r_a,
+        amount: m_a,
+    };
+
+    let action = Action::Deposit(deposit_inputs);
 
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
-    stdin.write(&args.n);
+    stdin.write(&action);
+    stdin.write(&phi);
+    stdin.write(&pp);
 
-    println!("n: {}", args.n);
     println!("Proof System: {:?}", args.system);
 
     // Generate the proof based on the selected proof system.
@@ -89,13 +135,21 @@ fn create_proof_fixture(
 ) {
     // Deserialize the public values.
     let bytes = proof.public_values.as_slice();
-    let PublicValuesStruct { n} = PublicValuesStruct::abi_decode(bytes, false).unwrap();
-
+    // Read the output.
+    let decoded = PublicValuesDeposit::abi_decode(bytes, true).unwrap();
+    let PublicValuesDeposit {
+        old_phi, 
+        next_phi, 
+        amount, 
+        pkey, 
+        v } = decoded;
     // Create the testing fixture so we can test things end-to-end.
-    let fixture = SP1FibonacciProofFixture {
-        a,
-        b,
-        n,
+    let fixture = SP1ProofDepositFixture {
+        old_phi: format!("0x{}", hex::encode(old_phi)),
+        next_phi: format!("0x{}", hex::encode(next_phi)),
+        pkey: format!("0x{}", hex::encode(pkey)),
+        v: format!("0x{}", hex::encode(v)),
+        amount: amount.into_limbs()[0],
         vkey: vk.bytes32().to_string(),
         public_values: format!("0x{}", hex::encode(bytes)),
         proof: format!("0x{}", hex::encode(proof.bytes())),
@@ -121,7 +175,7 @@ fn create_proof_fixture(
     let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../contracts/src/fixtures");
     std::fs::create_dir_all(&fixture_path).expect("failed to create fixture path");
     std::fs::write(
-        fixture_path.join(format!("{:?}-fixture.json", system).to_lowercase()),
+        fixture_path.join(format!("{:?}-zk-state-machine-fixture.json", system).to_lowercase()),
         serde_json::to_string_pretty(&fixture).unwrap(),
     )
     .expect("failed to write fixture");
