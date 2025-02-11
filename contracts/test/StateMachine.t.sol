@@ -67,4 +67,33 @@ contract StateMachineGroth16Test is Test {
 
         stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fakeProof);
     }
+
+    function test_deposit_valid_proof_valid_amount() public {
+        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
+        address user = makeAddr("user");
+        uint256 amount = 100;
+        vm.deal(user, amount);
+        vm.prank(user);
+        stateMachine.deposit{value: amount}(fixture.public_values, fixture.proof);
+        assertEq(stateMachine.getCurrentState(), fixture.next_phi);
+        assertEq(address(stateMachine).balance, amount);
+    }
+
+    function test_deposit_valid_proof_invalid_amount() public {
+        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
+        address user = makeAddr("user");
+        uint256 amount = 100;
+        vm.deal(user, amount);
+        vm.prank(user);
+        vm.expectRevert();
+        stateMachine.deposit{value: amount + 1}(fixture.public_values, fixture.proof);
+    }
 }

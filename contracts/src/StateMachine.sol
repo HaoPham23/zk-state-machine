@@ -13,6 +13,10 @@ contract StateMachine {
         phi = _phi;
     }
 
+    function getCurrentState() public view returns (bytes memory) {
+        return phi;
+    }
+
     function deposit(bytes calldata _publicValues, bytes calldata _proofBytes) public payable {
         (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = verifier.verifyStateMachineDepositProof(_publicValues, _proofBytes);
         require(keccak256(old_phi) == keccak256((phi)), "current state does not match");
