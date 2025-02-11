@@ -35,8 +35,11 @@ contract StateMachineGroth16Test is Test {
 
     function setUp() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixture();
-
-        verifier = address(new SP1VerifierGateway(address(1)));
+        if (block.chainid != 31337) {
+            verifier = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
+        } else {
+            verifier = address(new SP1VerifierGateway(address(1)));
+        }        
         stateMachineVerifier = new StateMachineVerifier(verifier, fixture.vkey);
         stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
     }
@@ -44,7 +47,9 @@ contract StateMachineGroth16Test is Test {
     function test_ValidStateMachineVerifierProof() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixture();
 
-        vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
 
         (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fixture.proof);
         assert(keccak256(old_phi) == keccak256(fixture.old_phi));
