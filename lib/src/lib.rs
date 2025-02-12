@@ -184,6 +184,7 @@ pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], balance: u64, 
     let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
     let next_phi = phi.add_affine(&multiplier);
     pp.v[idx] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
+    let _ = A;
     Ok(next_phi)
 }
 

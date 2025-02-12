@@ -1,7 +1,7 @@
-use state_machine_lib::ElGamal;
 #[allow(unused)]
-use state_machine_lib::{PublicParams, KZG, deposit, send, withdraw, rotate};
+use state_machine_lib::{PublicParams, ElGamal, KZG, deposit, send, withdraw, rotate};
 use sp1_bls12_381::{Scalar, G1Affine};
+use hex::decode;
 
 fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
     *time += 1;
@@ -54,10 +54,14 @@ fn main() {
     m_b -= amount;
     m_a += amount;
 
-    println!("User A withdraws {:?} ETH", amount);
+    let withdraw_amount = 10u64;
+
+    println!("User A withdraws {:?} ETH", withdraw_amount);
     println!("Update state...");
 
-    let A = [0u8; 20]; // TODO: need address
+    // private key: 0xc0cf034c2039fbb095aad1cd7dfd8854eddc5fcfed04e009520049107022b22b
+    let A = "65f697a02d756Cf4BC3465c1cC60dB3a4AF19521"; // TODO: need address
+    let A: [u8; 20] = decode(A).unwrap().try_into().unwrap();
     phi = withdraw(&mut pp, sk_a, r_a, m_a, amount, phi, A).unwrap();
     print_state(phi, &pp, &mut time);
     m_a -= amount;

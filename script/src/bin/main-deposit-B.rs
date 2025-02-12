@@ -12,7 +12,7 @@
 
 use alloy_sol_types::SolType;
 use clap::Parser;
-use state_machine_lib::{ElGamal, PublicParams, PublicValuesDeposit, PublicValuesWithdraw, PublicValuesSend, PublicValuesRotate, KZG, Action, Deposit};
+use state_machine_lib::{ElGamal, PublicParams, PublicValuesDeposit, KZG, Action, Deposit, deposit};
 use sp1_bls12_381::{G1Affine, Scalar};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
@@ -47,11 +47,11 @@ fn main() {
     // Setup the prover client.
     let client = ProverClient::from_env();
 
-    let pp = PublicParams::setup(16);
+    let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
-    let phi = kzg.commit(v).unwrap();
+    let mut phi = kzg.commit(v).unwrap();
 
     let sk_a = [1u64, 2, 3, 4];
     let pk_a = el_gamal.from_skey(sk_a);
@@ -67,10 +67,15 @@ fn main() {
     println!("User A deposits: {:?} ETH", m_a);
     println!("Update state...");
 
+    phi = deposit(&mut pp, pk_a, r_a, m_a, phi).unwrap();
+
+    println!("User B deposits: {:?} ETH", m_b);
+    println!("Update state...");
+
     let deposit_inputs = Deposit {
-        pkey: pk_a,
-        random: r_a,
-        amount: m_a,
+        pkey: pk_b,
+        random: r_b,
+        amount: m_b,
     };
 
     let action = Action::Deposit(deposit_inputs);
@@ -94,8 +99,8 @@ fn main() {
             amount, 
             pkey, 
             v } = decoded;
-        println!("old_phi: {:?}", G1Affine::from_compressed(old_phi.as_ref().try_into().unwrap()));
-        println!("next_phi: {:?}", G1Affine::from_compressed(next_phi.as_ref().try_into().unwrap()));
+        println!("old_phi: {:?}", old_phi);
+        println!("next_phi: {:?}", next_phi);
 
         // Record the number of cycles executed.
         println!("Number of cycles: {}", report.total_instruction_count());

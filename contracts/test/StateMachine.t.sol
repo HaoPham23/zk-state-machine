@@ -18,6 +18,32 @@ struct SP1ProofDepositFixtureJson {
     bytes32 vkey;
 }
 
+struct SP1ProofSendFixtureJson {
+    bytes next_phi;
+    bytes old_phi;
+    bytes proof;
+    bytes public_values;
+    bytes32 vkey;
+}
+
+struct SP1ProofWithdrawFixtureJson {
+    uint64 amount;
+    bytes next_phi;
+    bytes old_phi;
+    bytes proof;
+    bytes public_values;
+    address recipient;
+    bytes32 vkey;
+}
+
+struct SP1ProofRotateFixtureJson {
+    bytes next_phi;
+    bytes old_phi;
+    bytes proof;
+    bytes public_values;
+    bytes32 vkey;
+}
+
 contract StateMachineGroth16Test is Test {
     using stdJson for string;
 
@@ -25,27 +51,47 @@ contract StateMachineGroth16Test is Test {
     StateMachineVerifier public stateMachineVerifier;
     StateMachine public stateMachine;
 
-    function loadFixture() public view returns (SP1ProofDepositFixtureJson memory) {
+    function loadFixture(string memory relativePath) public view returns (bytes memory) {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/src/fixtures/groth16-zk-state-machine-fixture.json");
+        string memory path = string.concat(root, relativePath);
         string memory json = vm.readFile(path);
         bytes memory jsonBytes = vm.parseJson(json);
+        return jsonBytes;
+    }
+
+    function loadFixtureDeposit(string memory relativePath) public view returns (SP1ProofDepositFixtureJson memory) {
+        bytes memory jsonBytes = loadFixture(relativePath);
         return abi.decode(jsonBytes, (SP1ProofDepositFixtureJson));
     }
 
+    function loadFixtureSend() public view returns (SP1ProofSendFixtureJson memory) {
+        bytes memory jsonBytes = loadFixture("/src/fixtures/groth16-zk-state-machine-fixture-send.json");
+        return abi.decode(jsonBytes, (SP1ProofSendFixtureJson));
+    }
+
+    function loadFixtureWithdraw() public view returns (SP1ProofWithdrawFixtureJson memory) {
+        bytes memory jsonBytes = loadFixture("/src/fixtures/groth16-zk-state-machine-fixture-withdraw.json");
+        return abi.decode(jsonBytes, (SP1ProofWithdrawFixtureJson));
+    }
+
+    function loadFixtureRotate() public view returns (SP1ProofRotateFixtureJson memory) {
+        bytes memory jsonBytes = loadFixture("/src/fixtures/groth16-zk-state-machine-fixture-rotate.json");
+        return abi.decode(jsonBytes, (SP1ProofRotateFixtureJson));
+    }
+
     function setUp() public {
-        SP1ProofDepositFixtureJson memory fixture = loadFixture();
-        if (block.chainid != 31337) {
-            verifier = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
-        } else {
+        SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
+        if (block.chainid == 31337) {
             verifier = address(new SP1VerifierGateway(address(1)));
+        } else {
+            verifier = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
         }        
         stateMachineVerifier = new StateMachineVerifier(verifier, fixture.vkey);
         stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
     }
 
     function test_ValidStateMachineVerifierProof() public {
-        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+        SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
         if (block.chainid == 31337) {
             vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
@@ -59,17 +105,17 @@ contract StateMachineGroth16Test is Test {
         assert(v == fixture.v);
     }
 
-    function testFail_InvalidStateMachineVerifierProof() public view {
-        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+    function test_InvalidStateMachineVerifierProof() public {
+        SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
         // Create a fake proof.
         bytes memory fakeProof = new bytes(fixture.proof.length);
-
+        vm.expectRevert();
         stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fakeProof);
     }
 
     function test_deposit_valid_proof_valid_amount() public {
-        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+        SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
         if (block.chainid == 31337) {
             vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
@@ -84,7 +130,7 @@ contract StateMachineGroth16Test is Test {
     }
 
     function test_deposit_valid_proof_invalid_amount() public {
-        SP1ProofDepositFixtureJson memory fixture = loadFixture();
+        SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
         if (block.chainid == 31337) {
             vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
@@ -95,5 +141,108 @@ contract StateMachineGroth16Test is Test {
         vm.prank(user);
         vm.expectRevert();
         stateMachine.deposit{value: amount + 1}(fixture.public_values, fixture.proof);
+    }
+
+    function test_send_valid_proof() public {
+        SP1ProofDepositFixtureJson memory depositAFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
+        SP1ProofDepositFixtureJson memory depositBFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-b.json");
+        SP1ProofSendFixtureJson memory fixture = loadFixtureSend();
+
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
+        address userA = makeAddr("userA");
+        uint256 amountA = 100;
+        vm.deal(userA, amountA);
+        vm.prank(userA);
+        stateMachine.deposit{value: amountA}(depositAFixture.public_values, depositAFixture.proof);
+
+        address userB = makeAddr("userB");
+        uint256 amountB = 200;
+        vm.deal(userB, amountB);
+        vm.prank(userB);
+        stateMachine.deposit{value: amountB}(depositBFixture.public_values, depositBFixture.proof);
+
+        address relayer = makeAddr("relayer");
+        vm.prank(relayer);
+        stateMachine.send(fixture.public_values, fixture.proof);
+        assertEq(stateMachine.getCurrentState(), fixture.next_phi);
+    }
+
+    function test_withdraw_valid_proof() public {
+        // Setup
+        SP1ProofDepositFixtureJson memory depositAFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
+        SP1ProofDepositFixtureJson memory depositBFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-b.json");
+        SP1ProofSendFixtureJson memory sendFixture = loadFixtureSend();
+        SP1ProofWithdrawFixtureJson memory fixture = loadFixtureWithdraw();
+
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
+        // User A deposit 100 coins
+        address userA = makeAddr("userA");
+        uint256 amountA = 100;
+        vm.deal(userA, amountA);
+        vm.prank(userA);
+        stateMachine.deposit{value: amountA}(depositAFixture.public_values, depositAFixture.proof);
+
+        // User B deposit 200 coins
+        address userB = makeAddr("userB");
+        uint256 amountB = 200;
+        vm.deal(userB, amountB);
+        vm.prank(userB);
+        stateMachine.deposit{value: amountB}(depositBFixture.public_values, depositBFixture.proof);
+
+        // User B secretly send 30 coins to User A, submit by relayer
+        address relayer = makeAddr("relayer");
+        vm.prank(relayer);
+        stateMachine.send(sendFixture.public_values, sendFixture.proof);
+        
+        // User A secretly withdraw 10 coins to new address (recipient), submit by relayer
+        vm.prank(relayer);
+        stateMachine.withdraw(fixture.public_values, fixture.proof);
+        assertEq(stateMachine.getCurrentState(), fixture.next_phi);
+
+        address recipient = fixture.recipient;
+        assertEq(recipient.balance, fixture.amount);
+    }
+
+    function test_rotate_valid_proof() public {
+        // Setup
+        SP1ProofDepositFixtureJson memory depositAFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
+        SP1ProofDepositFixtureJson memory depositBFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-b.json");
+        SP1ProofSendFixtureJson memory sendFixture = loadFixtureSend();
+        SP1ProofWithdrawFixtureJson memory withdrawFixture = loadFixtureWithdraw();
+        SP1ProofRotateFixtureJson memory fixture = loadFixtureRotate();
+
+        if (block.chainid == 31337) {
+            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
+        }
+        // User A deposit 100 coins
+        address userA = makeAddr("userA");
+        uint256 amountA = 100;
+        vm.deal(userA, amountA);
+        vm.prank(userA);
+        stateMachine.deposit{value: amountA}(depositAFixture.public_values, depositAFixture.proof);
+
+        // User B deposit 200 coins
+        address userB = makeAddr("userB");
+        uint256 amountB = 200;
+        vm.deal(userB, amountB);
+        vm.prank(userB);
+        stateMachine.deposit{value: amountB}(depositBFixture.public_values, depositBFixture.proof);
+
+        // User B secretly send 30 coins to User A, submit by relayer
+        address relayer = makeAddr("relayer");
+        vm.prank(relayer);
+        stateMachine.send(sendFixture.public_values, sendFixture.proof);
+        
+        // User A secretly withdraw 10 coins to new address (recipient), submit by relayer
+        vm.prank(relayer);
+        stateMachine.withdraw(withdrawFixture.public_values, withdrawFixture.proof);
+
+        vm.prank(relayer);
+        stateMachine.rotate(fixture.public_values, fixture.proof);
+        assertEq(stateMachine.getCurrentState(), fixture.next_phi);
     }
 }

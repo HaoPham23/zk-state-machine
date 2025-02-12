@@ -32,7 +32,8 @@ contract FibonacciGroth16Test is Test {
     function setUp() public {
         SP1ProofFixtureJson memory fixture = loadFixture();
 
-        verifier = address(new SP1VerifierGateway(address(1)));
+        // verifier = address(new SP1VerifierGateway(address(0x397A5f7f3dBd538f23DE225B51f532c34448dA9B)));
+        verifier = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
         fibonacci = new Fibonacci(verifier, fixture.vkey);
     }
 
@@ -47,12 +48,12 @@ contract FibonacciGroth16Test is Test {
         assert(b == fixture.b);
     }
 
-    function testFail_InvalidFibonacciProof() public view {
+    function test_InvalidFibonacciProof() public {
         SP1ProofFixtureJson memory fixture = loadFixture();
 
         // Create a fake proof.
         bytes memory fakeProof = new bytes(fixture.proof.length);
-
+        vm.expectRevert();
         fibonacci.verifyFibonacciProof(fixture.publicValues, fakeProof);
     }
 }
@@ -90,12 +91,12 @@ contract FibonacciPlonkTest is Test {
         assert(b == fixture.b);
     }
 
-    function testFail_InvalidFibonacciProof() public view {
+    function test_InvalidFibonacciProof() public {
         SP1ProofFixtureJson memory fixture = loadFixture();
 
         // Create a fake proof.
         bytes memory fakeProof = new bytes(fixture.proof.length);
-
+        vm.expectRevert();
         fibonacci.verifyFibonacciProof(fixture.publicValues, fakeProof);
     }
 }

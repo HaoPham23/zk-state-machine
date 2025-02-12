@@ -12,7 +12,7 @@
 
 use alloy_sol_types::SolType;
 use clap::{Parser, ValueEnum};
-use state_machine_lib::{PublicParams, PublicValuesDeposit, KZG, ElGamal, Action, Deposit};
+use state_machine_lib::{deposit, PublicParams, PublicValuesSend, KZG, ElGamal, Action, Send};
 use sp1_bls12_381::Scalar;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{
@@ -54,12 +54,9 @@ struct SP1FibonacciProofFixture {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SP1ProofDepositFixture {
+struct SP1ProofSendFixture {
     old_phi: String,
     next_phi: String,
-    amount: u64,
-    pkey: String,
-    v: String,
     vkey: String,
     public_values: String,
     proof: String,
@@ -81,11 +78,11 @@ fn main() {
     // Setup the prover client.
     let client = ProverClient::from_env();
 
-    let pp = PublicParams::setup(16);
+    let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
-    let phi = kzg.commit(v).unwrap();
+    let mut phi = kzg.commit(v).unwrap();
 
     let sk_a = [1u64, 2, 3, 4];
     let pk_a = el_gamal.from_skey(sk_a);
@@ -101,13 +98,25 @@ fn main() {
     println!("User A deposits: {:?} ETH", m_a);
     println!("Update state...");
 
-    let deposit_inputs = Deposit {
-        pkey: pk_a,
-        random: r_a,
-        amount: m_a,
+    phi = deposit(&mut pp, pk_a, r_a, m_a, phi).unwrap();
+
+    println!("User B deposits: {:?} ETH", m_b);
+    println!("Update state...");
+
+    phi = deposit(&mut pp, pk_b, r_b, m_b, phi).unwrap();
+
+    let amount = 30u64;
+    println!("User B sends {:?} ETH to User A", amount);
+    println!("Update state...");
+
+    let send_inputs = Send {
+        balance_sender: m_b,
+        amount,
+        pkey_receiver: pk_a,
+        skey_sender: sk_b,
     };
 
-    let action = Action::Deposit(deposit_inputs);
+    let action = Action::Send(send_inputs);
 
     // Setup the inputs.
     let mut stdin = SP1Stdin::new();
@@ -136,20 +145,14 @@ fn create_proof_fixture(
     // Deserialize the public values.
     let bytes = proof.public_values.as_slice();
     // Read the output.
-    let decoded = PublicValuesDeposit::abi_decode(bytes, true).unwrap();
-    let PublicValuesDeposit {
+    let decoded = PublicValuesSend::abi_decode(bytes, true).unwrap();
+    let PublicValuesSend {
         old_phi, 
-        next_phi, 
-        amount, 
-        pkey, 
-        v } = decoded;
+        next_phi} = decoded;
     // Create the testing fixture so we can test things end-to-end.
-    let fixture = SP1ProofDepositFixture {
+    let fixture = SP1ProofSendFixture {
         old_phi: format!("0x{}", hex::encode(old_phi)),
         next_phi: format!("0x{}", hex::encode(next_phi)),
-        pkey: format!("0x{}", hex::encode(pkey)),
-        v: format!("0x{}", hex::encode(v)),
-        amount: amount.into_limbs()[0],
         vkey: vk.bytes32().to_string(),
         public_values: format!("0x{}", hex::encode(bytes)),
         proof: format!("0x{}", hex::encode(proof.bytes())),
@@ -175,7 +178,7 @@ fn create_proof_fixture(
     let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../contracts/src/fixtures");
     std::fs::create_dir_all(&fixture_path).expect("failed to create fixture path");
     std::fs::write(
-        fixture_path.join(format!("{:?}-zk-state-machine-fixture.json", system).to_lowercase()),
+        fixture_path.join(format!("{:?}-zk-state-machine-fixture-send.json", system).to_lowercase()),
         serde_json::to_string_pretty(&fixture).unwrap(),
     )
     .expect("failed to write fixture");

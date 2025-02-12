@@ -4826,6 +4826,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types 0.7.7",
  "bls12_381 0.8.0",
+ "hex",
  "kzg-rs",
  "sp1-zkvm",
  "state-machine-lib",
