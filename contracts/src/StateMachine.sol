@@ -5,7 +5,7 @@ import { StateMachineVerifier } from "./StateMachineVerifier.sol";
 
 contract StateMachine {
     StateMachineVerifier verifier;
-    bytes public phi;
+    bytes internal phi;
     mapping(bytes32 => bytes32) public publicKeyToRandomness;
 
     constructor(address _verifier, bytes memory _phi) {
