@@ -137,7 +137,7 @@ contract StateMachineGroth16Test is Test {
         }
         address user = makeAddr("user");
         uint256 amount = 100;
-        vm.deal(user, amount);
+        vm.deal(user, amount + 1);
         vm.prank(user);
         vm.expectRevert();
         stateMachine.deposit{value: amount + 1}(fixture.public_values, fixture.proof);
