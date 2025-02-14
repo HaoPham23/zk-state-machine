@@ -6,6 +6,8 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {StateMachine} from "../src/StateMachine.sol";
 import {StateMachineVerifier} from "../src/StateMachineVerifier.sol";
 import {SP1VerifierGateway} from "@sp1-contracts/SP1VerifierGateway.sol";
+import {SP1Verifier as SP1VerifierGroth16} from "@sp1-contracts/v4.0.0-rc.3/SP1VerifierGroth16.sol";
+import {SP1Verifier as SP1VerifierPlonk} from "@sp1-contracts/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 
 struct SP1ProofDepositFixtureJson {
     uint64 amount;
@@ -47,7 +49,10 @@ struct SP1ProofRotateFixtureJson {
 contract StateMachineGroth16Test is Test {
     using stdJson for string;
 
-    address verifier;
+    address gateway;
+    address owner;
+    SP1VerifierGroth16 verifierGroth16;
+    SP1VerifierPlonk verifierPlonk;
     StateMachineVerifier public stateMachineVerifier;
     StateMachine public stateMachine;
 
@@ -82,20 +87,37 @@ contract StateMachineGroth16Test is Test {
     function setUp() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
         if (block.chainid == 31337) {
-            verifier = address(new SP1VerifierGateway(address(1)));
+            verifierGroth16 = new SP1VerifierGroth16();
+            verifierPlonk = new SP1VerifierPlonk();
+            owner = makeAddr("owner");
+            gateway = address(new SP1VerifierGateway(owner));
+            vm.startPrank(owner);
+            SP1VerifierGateway(gateway).addRoute(address(verifierGroth16));
+            SP1VerifierGateway(gateway).addRoute(address(verifierPlonk));
+            vm.stopPrank();
         } else {
-            verifier = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
+            gateway = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
         }        
-        stateMachineVerifier = new StateMachineVerifier(verifier, fixture.vkey);
+        stateMachineVerifier = new StateMachineVerifier(gateway, fixture.vkey);
         stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
+    }
+
+    function test_setup_gateway() public {
+        assertEq(SP1VerifierGateway(gateway).owner(), owner);
+
+        bytes4 selectorGroth16 = bytes4(verifierGroth16.VERIFIER_HASH());
+        (address verifier, bool frozen) = SP1VerifierGateway(gateway).routes(selectorGroth16);
+        assertEq(verifier, address(verifierGroth16));
+        assertEq(frozen, false);
+
+        bytes4 selectorPlonk = bytes4(verifierPlonk.VERIFIER_HASH());
+        (verifier, frozen) = SP1VerifierGateway(gateway).routes(selectorPlonk);
+        assertEq(verifier, address(verifierPlonk));
+        assertEq(frozen, false);
     }
 
     function test_ValidStateMachineVerifierProof() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
-
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
 
         (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fixture.proof);
         assert(keccak256(old_phi) == keccak256(fixture.old_phi));
@@ -117,9 +139,6 @@ contract StateMachineGroth16Test is Test {
     function test_deposit_valid_proof_valid_amount() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
         address user = makeAddr("user");
         uint256 amount = 100;
         vm.deal(user, amount);
@@ -132,9 +151,6 @@ contract StateMachineGroth16Test is Test {
     function test_deposit_valid_proof_invalid_amount() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
         address user = makeAddr("user");
         uint256 amount = 100;
         vm.deal(user, amount + 1);
@@ -148,9 +164,6 @@ contract StateMachineGroth16Test is Test {
         SP1ProofDepositFixtureJson memory depositBFixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-b.json");
         SP1ProofSendFixtureJson memory fixture = loadFixtureSend();
 
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
         address userA = makeAddr("userA");
         uint256 amountA = 100;
         vm.deal(userA, amountA);
@@ -176,9 +189,6 @@ contract StateMachineGroth16Test is Test {
         SP1ProofSendFixtureJson memory sendFixture = loadFixtureSend();
         SP1ProofWithdrawFixtureJson memory fixture = loadFixtureWithdraw();
 
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
         // User A deposit 100 coins
         address userA = makeAddr("userA");
         uint256 amountA = 100;
@@ -215,9 +225,6 @@ contract StateMachineGroth16Test is Test {
         SP1ProofWithdrawFixtureJson memory withdrawFixture = loadFixtureWithdraw();
         SP1ProofRotateFixtureJson memory fixture = loadFixtureRotate();
 
-        if (block.chainid == 31337) {
-            vm.mockCall(verifier, abi.encodeWithSelector(SP1VerifierGateway.verifyProof.selector), abi.encode(true));
-        }
         // User A deposit 100 coins
         address userA = makeAddr("userA");
         uint256 amountA = 100;
