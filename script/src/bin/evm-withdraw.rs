@@ -139,12 +139,18 @@ fn main() {
 
     println!("Proof System: {:?}", args.system);
 
+    let start = std::time::Instant::now();
     // Generate the proof based on the selected proof system.
     let proof = match args.system {
         ProofSystem::Plonk => client.prove(&pk, &stdin).plonk().run(),
         ProofSystem::Groth16 => client.prove(&pk, &stdin).groth16().run(),
     }
     .expect("failed to generate proof");
+    println!("Proof generation time: {:?}", start.elapsed());
+
+    let start = std::time::Instant::now();
+    client.verify(&proof, &vk).expect("failed to verify proof");
+    println!("Proof verification time: {:?}", start.elapsed());
 
     create_proof_fixture(&proof, &vk, args.system);
 }

@@ -109,7 +109,9 @@ fn main() {
 
     if args.execute {
         // Execute the program
+        let start = std::time::Instant::now();
         let (output, report) = client.execute(STATEMACHINE_ELF, &stdin).run().unwrap();
+        println!("Execution time: {:?}", start.elapsed());
         println!("Program executed successfully.");
 
         // Read the output.
