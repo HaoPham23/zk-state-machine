@@ -78,9 +78,6 @@ fn main() {
     // Setup the program.
     let (pk, vk) = client.setup(STATEMACHINE_ELF);
 
-    // Setup the prover client.
-    let client = ProverClient::from_env();
-
     let pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
