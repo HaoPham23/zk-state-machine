@@ -12,9 +12,9 @@
 
 use alloy_sol_types::SolType;
 use clap::Parser;
-use state_machine_lib::{ElGamal, PublicParams, PublicValuesDeposit, KZG, Action, Deposit};
-use sp1_bls12_381::{G1Affine, Scalar};
+use sp1_bls12_381::Scalar;
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use state_machine_lib::{Action, Deposit, ElGamal, PublicParams, PublicValuesDeposit, KZG};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const STATEMACHINE_ELF: &[u8] = include_elf!("state-machine-program");
@@ -28,7 +28,6 @@ struct Args {
 
     #[clap(long)]
     prove: bool,
-
 }
 
 fn main() {
@@ -49,7 +48,7 @@ fn main() {
 
     let pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let phi = kzg.commit(v).unwrap();
 
@@ -61,7 +60,7 @@ fn main() {
     println!("User B's public key: {:?}", pk_b);
     println!("User B's secret key: {:?}", sk_b);
 
-    let (m_a, m_b) = (100u64, 200u64);    
+    let (m_a, m_b) = (100u64, 200u64);
     let (r_a, r_b) = ([0x1111u64, 0, 0, 0], [0x2222u64, 0, 0, 0]); // TODO: need random
     println!("User A generates random number r = {:?}", r_a);
     println!("User A deposits: {:?} ETH", m_a);
@@ -85,17 +84,18 @@ fn main() {
         // Execute the program
         let start = std::time::Instant::now();
         let (output, report) = client.execute(STATEMACHINE_ELF, &stdin).run().unwrap();
-        println!("Execution time: {:?}", start.elapsed());        
+        println!("Execution time: {:?}", start.elapsed());
         println!("Program executed successfully.");
 
         // Read the output.
         let decoded = PublicValuesDeposit::abi_decode(output.as_slice(), true).unwrap();
         let PublicValuesDeposit {
-            old_phi, 
-            next_phi, 
-            amount, 
-            pkey, 
-            v } = decoded;
+            old_phi,
+            next_phi,
+            amount,
+            pkey,
+            t,
+        } = decoded;
         println!("old_phi: {:?}", old_phi);
         println!("next_phi: {:?}", next_phi);
 

@@ -13,7 +13,7 @@
 use alloy_sol_types::SolType;
 use clap::Parser;
 use state_machine_lib::{ElGamal, PublicParams, PublicValuesSend, KZG, Action, Send, deposit};
-use sp1_bls12_381::{G1Affine, Scalar};
+use sp1_bls12_381::Scalar;
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -49,7 +49,7 @@ fn main() {
 
     let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
 

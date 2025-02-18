@@ -9,14 +9,14 @@ fn print_state(phi: G1Affine, pp: &PublicParams, time: &mut u64) {
     println!("[+] phi_{} = {:?}", *time, phi);
     // println!("[+] v = {:?}", pp.v);
     // println!("[+] t = {:?}", pp.t);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     assert_eq!(kzg.commit(pp.v.clone()).unwrap(), phi);
 }
 
 fn main() {
     let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
     println!("{:?}", phi);
@@ -83,7 +83,8 @@ fn main() {
     let new_r = [0x1112u64, 0, 0, 0]; // = r_a + add_additive
     println!("User A rotates his secret");
     println!("Update state...");
-    phi = rotate(&mut pp, sk_a, add_additive, phi).unwrap();
+    let (new_phi, _) = rotate(&mut pp, sk_a, add_additive, phi).unwrap();
+    phi = new_phi;
     print_state(phi, &pp, &mut time);
 
     println!("User A withdraws {:?} ETH using old secret", amount);

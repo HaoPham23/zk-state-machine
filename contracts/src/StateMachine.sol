@@ -40,8 +40,9 @@ contract StateMachine {
     }
 
     function rotate(bytes calldata _publicValues, bytes calldata _proofBytes) public {
-        (bytes memory old_phi, bytes memory next_phi) = verifier.verifyStateMachineRotateProof(_publicValues, _proofBytes);
+        (bytes memory old_phi, bytes memory next_phi, bytes32 pubkey, bytes32 new_t) = verifier.verifyStateMachineRotateProof(_publicValues, _proofBytes);
         require(keccak256(old_phi) == keccak256((phi)), "current state does not match");
+        publicKeyToRandomness[pubkey] = new_t;
         phi = next_phi;
     }
 }

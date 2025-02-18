@@ -77,7 +77,7 @@ fn main() {
 
     let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
 

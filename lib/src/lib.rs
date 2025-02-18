@@ -91,16 +91,12 @@ impl PublicParams {
 
 #[derive(Debug)]
 pub struct KZG {
-    g1_points: Vec<G1Affine>,
-    g2_points: Vec<G2Affine>,
     g1_lagrange_basis: Vec<G1Affine>
 }
 
 impl KZG {
-    pub fn new(g1_points: Vec<G1Affine>, g2_points: Vec<G2Affine>, g1_lagrange_basis: Vec<G1Affine>) -> KZG {
+    pub fn new(g1_lagrange_basis: Vec<G1Affine>) -> KZG {
         KZG {
-            g1_points,
-            g2_points,
             g1_lagrange_basis
         }
     }
@@ -163,7 +159,7 @@ pub fn deposit(pp: &mut PublicParams, pk_a: Scalar, r_a: [u64; 4], m_a: u64 , ph
     Ok(next_phi)
 }
 
-pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], balance: u64,  amount: u64, phi: G1Affine, A: [u8; 20]) -> Result<G1Affine, String> {
+pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], balance: u64,  amount: u64, phi: G1Affine, recipient: [u8; 20]) -> Result<G1Affine, String> {
     let el_gamal = ElGamal::new(pp.g);
     let g_r = pp.g.pow(&r);
     let pk = el_gamal.from_skey(sk);
@@ -184,7 +180,7 @@ pub fn withdraw(pp: &mut PublicParams, sk: [u64; 4], r: [u64; 4], balance: u64, 
     let multiplier = G1Affine::from(pp.g1_lagrange_basis[idx] * delta);
     let next_phi = phi.add_affine(&multiplier);
     pp.v[idx] *= pp.g.pow(&[amount, 0, 0, 0]).invert().unwrap();
-    let _ = A;
+    let _ = recipient;
     Ok(next_phi)
 }
 
@@ -218,7 +214,7 @@ pub fn send(pp: &mut PublicParams, sk_sender: [u64; 4], pk_receiver: Scalar, bal
     Ok(next_phi)
 }
 
-pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], phi: G1Affine) -> Result<G1Affine, String> {
+pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], phi: G1Affine) -> Result<(G1Affine, usize), String> {
     let el_gamal = ElGamal::new(pp.g);
     let pkey = el_gamal.from_skey(skey);
     let idx = match pp.index_of.get(&pkey.to_bytes()) {
@@ -230,9 +226,8 @@ pub fn rotate(pp: &mut PublicParams, skey: [u64; 4] , new_additive: [u64; 4], ph
     let next_phi = phi.add_affine(&multiplier);
     pp.t[idx] *= pp.g.pow(&new_additive);
     pp.v[idx] *= pkey.pow(&new_additive);
-    Ok(next_phi)
+    Ok((next_phi, idx))
 }
-
 
 sol! {
     /// The public values encoded as a struct that can be easily deserialized inside Solidity.
@@ -241,7 +236,7 @@ sol! {
         bytes next_phi;
         uint256 amount;
         bytes32 pkey;
-        bytes32 v;
+        bytes32 t;
     }
 
     struct PublicValuesSend {
@@ -259,6 +254,8 @@ sol! {
     struct PublicValuesRotate {
         bytes old_phi;
         bytes next_phi;
+        bytes32 pkey;
+        bytes32 new_t;
     }
 }
 

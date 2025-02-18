@@ -14,7 +14,7 @@ use alloy_sol_types::SolType;
 use hex::{encode, decode};
 use clap::Parser;
 use state_machine_lib::{deposit, send, withdraw, Action, ElGamal, PublicParams, PublicValuesRotate, Rotate, KZG};
-use sp1_bls12_381::{G1Affine, Scalar};
+use sp1_bls12_381::Scalar;
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
@@ -50,7 +50,7 @@ fn main() {
 
     let mut pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let mut phi = kzg.commit(v).unwrap();
 
@@ -92,14 +92,14 @@ fn main() {
     println!("Update state...");
 
     // private key: 0xc0cf034c2039fbb095aad1cd7dfd8854eddc5fcfed04e009520049107022b22b
-    let A = "65f697a02d756Cf4BC3465c1cC60dB3a4AF19521"; // TODO: need address
-    let A: [u8; 20] = decode(A).unwrap().try_into().unwrap();
-    phi = withdraw(&mut pp, sk_a, r_a, m_a, withdraw_amount, phi, A).unwrap();
+    let recipient = "65f697a02d756Cf4BC3465c1cC60dB3a4AF19521"; // TODO: need address
+    let recipient: [u8; 20] = decode(recipient).unwrap().try_into().unwrap();
+    phi = withdraw(&mut pp, sk_a, r_a, m_a, withdraw_amount, phi, recipient).unwrap();
     println!("phi: {:?}", encode(phi.to_compressed()));
     m_a -= withdraw_amount;
 
     let add_additive = [1u64, 0, 0, 0];
-    let new_r = [0x1112u64, 0, 0, 0]; // = r_a + add_additive
+    let _new_r = [0x1112u64, 0, 0, 0]; // = r_a + add_additive
     println!("User A rotates his secret");
     println!("Update state...");
 
@@ -127,8 +127,9 @@ fn main() {
         let decoded = PublicValuesRotate::abi_decode(output.as_slice(), true).unwrap();
         let PublicValuesRotate {
             old_phi, 
-            next_phi, 
-            } = decoded;
+            next_phi,
+            pkey,
+            new_t} = decoded;
         println!("old_phi: {:?}", old_phi);
         println!("next_phi: {:?}", next_phi);
 

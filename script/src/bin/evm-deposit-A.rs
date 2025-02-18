@@ -59,7 +59,7 @@ struct SP1ProofDepositFixture {
     next_phi: String,
     amount: u64,
     pkey: String,
-    v: String,
+    t: String,
     vkey: String,
     public_values: String,
     proof: String,
@@ -80,7 +80,7 @@ fn main() {
 
     let pp = PublicParams::setup(16);
     let el_gamal = ElGamal::new(pp.g);
-    let kzg = KZG::new(pp.g1_points.clone(), pp.g2_points.clone(), pp.g1_lagrange_basis.clone());
+    let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
     let phi = kzg.commit(v).unwrap();
 
@@ -126,7 +126,7 @@ fn main() {
     let start = std::time::Instant::now();
     client.verify(&proof, &vk).expect("failed to verify proof");
     println!("Proof verification time: {:?}", start.elapsed());
-    
+
     create_proof_fixture(&proof, &vk, args.system);
 }
 
@@ -145,13 +145,13 @@ fn create_proof_fixture(
         next_phi, 
         amount, 
         pkey, 
-        v } = decoded;
+        t } = decoded;
     // Create the testing fixture so we can test things end-to-end.
     let fixture = SP1ProofDepositFixture {
         old_phi: format!("0x{}", hex::encode(old_phi)),
         next_phi: format!("0x{}", hex::encode(next_phi)),
         pkey: format!("0x{}", hex::encode(pkey)),
-        v: format!("0x{}", hex::encode(v)),
+        t: format!("0x{}", hex::encode(t)),
         amount: amount.into_limbs()[0],
         vkey: vk.bytes32().to_string(),
         public_values: format!("0x{}", hex::encode(bytes)),

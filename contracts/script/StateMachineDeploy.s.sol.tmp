@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Script, console} from "forge-std/Test.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+import {StateMachine} from "../src/StateMachine.sol";
+import {StateMachineVerifier} from "../src/StateMachineVerifier.sol";
+import {SP1VerifierGateway} from "@sp1-contracts/SP1VerifierGateway.sol";
+import {SP1Verifier as SP1VerifierGroth16} from "@sp1-contracts/v4.0.0-rc.3/SP1VerifierGroth16.sol";
+import {SP1Verifier as SP1VerifierPlonk} from "@sp1-contracts/v4.0.0-rc.3/SP1VerifierPlonk.sol";
+
+contract StateMachineDeploy is Script {
+    StateMachine stateMachine;
+    StateMachineVerifier verifier;
+    SP1VerifierGroth16 sp1VerifierGroth16;
+    SP1VerifierPlonk sp1VerifierPlonk;
+    SP1VerifierGateway sp1VerifierGateway;
+
+    function deploy() public {
+        verifier = new StateMachineVerifier();
+        sp1VerifierGroth16 = new SP1VerifierGroth16();
+        sp1VerifierPlonk = new SP1VerifierPlonk();
+        sp1VerifierGateway = new SP1VerifierGateway(sp1VerifierGroth16, sp1VerifierPlonk);
+        stateMachine = new StateMachine(address(verifier), stdJson.encode("0x"));
+    }
+
+    function getStateMachine() public view returns (address) {
+        return address(stateMachine);
+    }
+
+    function getVerifier() public view returns (address) {
+        return address(verifier);
+    }
+
+    function getSP1VerifierGroth16() public view returns (address) {
+        return address(sp1VerifierGroth16);
+    }
+
+    function getSP1VerifierPlonk() public view returns (address) {
+        return address(sp1VerifierPlonk);
+    }
+
+    function getSP1VerifierGateway() public view returns (address) {
+        return address(sp1VerifierGateway);
+    }
+}

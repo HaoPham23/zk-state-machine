@@ -8,7 +8,7 @@ struct PublicValuesDeposit {
     bytes next_phi;
     uint256 amount;
     bytes32 pkey;
-    bytes32 v;
+    bytes32 t;
 }
 
 struct PublicValuesSend {
@@ -26,6 +26,8 @@ struct PublicValuesWithdraw {
 struct PublicValuesRotate {
     bytes old_phi;
     bytes next_phi;
+    bytes32 new_t;
+    bytes32 pkey;
 }
 
 contract StateMachineVerifier {
@@ -51,7 +53,7 @@ contract StateMachineVerifier {
     {
         ISP1Verifier(verifier).verifyProof(stateMachineProgramVKey, _publicValues, _proofBytes);
         PublicValuesDeposit memory publicValues = abi.decode(_publicValues, (PublicValuesDeposit));
-        return (publicValues.old_phi, publicValues.next_phi, publicValues.amount, publicValues.pkey, publicValues.v);
+        return (publicValues.old_phi, publicValues.next_phi, publicValues.amount, publicValues.pkey, publicValues.t);
     }
 
     function verifyStateMachineSendProof(bytes calldata _publicValues, bytes calldata _proofBytes)
@@ -77,10 +79,10 @@ contract StateMachineVerifier {
     function verifyStateMachineRotateProof(bytes calldata _publicValues, bytes calldata _proofBytes)
         public
         view
-        returns (bytes memory, bytes memory)
+        returns (bytes memory, bytes memory, bytes32, bytes32)
     {
         ISP1Verifier(verifier).verifyProof(stateMachineProgramVKey, _publicValues, _proofBytes);
         PublicValuesRotate memory publicValues = abi.decode(_publicValues, (PublicValuesRotate));
-        return (publicValues.old_phi, publicValues.next_phi);
+        return (publicValues.old_phi, publicValues.next_phi, publicValues.pkey, publicValues.new_t);
     }
 }

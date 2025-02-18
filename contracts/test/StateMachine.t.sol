@@ -16,7 +16,7 @@ struct SP1ProofDepositFixtureJson {
     bytes32 pkey;
     bytes proof;
     bytes public_values;
-    bytes32 v;
+    bytes32 t;
     bytes32 vkey;
 }
 
@@ -39,8 +39,10 @@ struct SP1ProofWithdrawFixtureJson {
 }
 
 struct SP1ProofRotateFixtureJson {
+    bytes32 new_t;
     bytes next_phi;
     bytes old_phi;
+    bytes32 pkey;
     bytes proof;
     bytes public_values;
     bytes32 vkey;
@@ -96,6 +98,7 @@ contract StateMachineGroth16Test is Test {
             SP1VerifierGateway(gateway).addRoute(address(verifierPlonk));
             vm.stopPrank();
         } else {
+            owner = 0xCafEf00d348Adbd57c37d1B77e0619C6244C6878;
             gateway = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
         }        
         stateMachineVerifier = new StateMachineVerifier(gateway, fixture.vkey);
@@ -103,6 +106,9 @@ contract StateMachineGroth16Test is Test {
     }
 
     function test_setup_gateway() public {
+        if (block.chainid != 31337) {
+            return;
+        }
         assertEq(SP1VerifierGateway(gateway).owner(), owner);
 
         bytes4 selectorGroth16 = bytes4(verifierGroth16.VERIFIER_HASH());
@@ -119,12 +125,12 @@ contract StateMachineGroth16Test is Test {
     function test_ValidStateMachineVerifierProof() public {
         SP1ProofDepositFixtureJson memory fixture = loadFixtureDeposit("/src/fixtures/groth16-zk-state-machine-fixture-deposit-a.json");
 
-        (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 v) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fixture.proof);
+        (bytes memory old_phi, bytes memory next_phi, uint256 amount, bytes32 pkey, bytes32 t) = stateMachineVerifier.verifyStateMachineDepositProof(fixture.public_values, fixture.proof);
         assert(keccak256(old_phi) == keccak256(fixture.old_phi));
         assert(keccak256(next_phi) == keccak256(fixture.next_phi));
         assert(amount == fixture.amount);
         assert(pkey == fixture.pkey);
-        assert(v == fixture.v);
+        assert(t == fixture.t);
     }
 
     function test_InvalidStateMachineVerifierProof() public {

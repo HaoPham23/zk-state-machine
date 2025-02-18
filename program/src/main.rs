@@ -30,7 +30,7 @@ pub fn main() {
                 next_phi: next_phi.to_compressed().into(),
                 amount: alloy_sol_types::private::u256(deposit_inputs.amount),
                 pkey: deposit_inputs.pkey.to_bytes().into(),
-                v: pp.v[pp.idx - 1].to_bytes().into()
+                t: pp.t[pp.idx - 1].to_bytes().into()
             })
         },
         Action::Send(send_inputs) => {
@@ -53,10 +53,12 @@ pub fn main() {
         },
         Action::Rotate(rotate_inputs)=> {
             // Handle rotate
-            let next_phi = rotate(&mut pp, rotate_inputs.skey, rotate_inputs.new_additive, phi).unwrap();
+            let (next_phi, idx) = rotate(&mut pp, rotate_inputs.skey, rotate_inputs.new_additive, phi).unwrap();
             PublicValuesRotate::abi_encode(&PublicValuesRotate {
                 old_phi: phi.to_compressed().into(),
                 next_phi: next_phi.to_compressed().into(),
+                pkey: pp.pkeys[idx].to_bytes().into(),
+                new_t: pp.t[idx].to_bytes().into()
             })
         },
     };
