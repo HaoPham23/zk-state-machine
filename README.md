@@ -28,7 +28,11 @@ To run the program without generating a proof:
 
 ```sh
 cd script
-cargo run --release -- --execute
+cargo run main-deposit-A --release -- --execute
+cargo run main-deposit-B --release -- --execute
+cargo run main-send --release -- --execute
+cargo run main-withdraw --release -- --execute
+cargo run main-rotate --release -- --execute
 ```
 
 This will execute the program and display the output.
@@ -39,7 +43,11 @@ To generate a core proof for your program:
 
 ```sh
 cd script
-cargo run --release -- --prove
+cargo run main-deposit-A --release --prove
+cargo run main-deposit-B --release --prove
+cargo run main-send --release --prove
+cargo run main-withdraw --release --prove
+cargo run main-rotate --release --prove
 ```
 
 ### Generate an EVM-Compatible Proof
@@ -51,13 +59,21 @@ To generate a proof that is small enough to be verified on-chain and verifiable 
 
 ```sh
 cd script
-cargo run --release --bin evm -- --system groth16
+cargo run --release --bin evm-deposit-A -- --system groth16
+cargo run --release --bin evm-deposit-B -- --system groth16
+cargo run --release --bin evm-send -- --system groth16
+cargo run --release --bin evm-withdraw -- --system groth16
+cargo run --release --bin evm-rotate -- --system groth16
 ```
 
 this will generate a Groth16 proof. If you want to generate a PLONK proof, run the following command:
 
 ```sh
-cargo run --release --bin evm -- --system plonk
+cargo run --release --bin evm-deposit-A -- --system plonk
+cargo run --release --bin evm-deposit-B -- --system plonk
+cargo run --release --bin evm-send -- --system plonk
+cargo run --release --bin evm-withdraw -- --system plonk
+cargo run --release --bin evm-rotate -- --system plonk
 ```
 
 These commands will also generate fixtures that can be used to test the verification of SP1 zkVM proofs
