@@ -28,6 +28,9 @@ struct Args {
 
     #[clap(long)]
     prove: bool,
+
+    #[clap(long, default_value = "16")]
+    n: u32,
 }
 
 fn main() {
@@ -46,7 +49,7 @@ fn main() {
     // Setup the prover client.
     let client = ProverClient::from_env();
 
-    let pp = PublicParams::setup(16);
+    let pp = PublicParams::setup(args.n as usize);
     let el_gamal = ElGamal::new(pp.g);
     let kzg = KZG::new(pp.g1_lagrange_basis.clone());
     let v = vec![Scalar::zero(); pp.degree];
