@@ -96,13 +96,15 @@ contract StateMachineGroth16Test is Test {
             vm.startPrank(owner);
             SP1VerifierGateway(gateway).addRoute(address(verifierGroth16));
             SP1VerifierGateway(gateway).addRoute(address(verifierPlonk));
+            stateMachineVerifier = new StateMachineVerifier(gateway, fixture.vkey);
+            stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
             vm.stopPrank();
-        } else {
+        } else if (block.chainid == 11155111) {
             owner = 0xCafEf00d348Adbd57c37d1B77e0619C6244C6878;
             gateway = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
+            stateMachineVerifier = StateMachineVerifier(0x51BcB68D81C3d167deb2c913E5de5478B40A1a77);
+            stateMachine = StateMachine(0x62F3cC26FB8e8B06aC13274f1728EdcBd1fac921);
         }        
-        stateMachineVerifier = new StateMachineVerifier(gateway, fixture.vkey);
-        stateMachine = new StateMachine(address(stateMachineVerifier), fixture.old_phi);
     }
 
     function test_setup_gateway() public {
